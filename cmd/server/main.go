@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
+
+	"github.com/csessh/1M-backend/internal/redis"
 
 	"github.com/gorilla/websocket"
 )
@@ -30,11 +33,20 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			log.Println("Read error:", err)
 			break
 		}
+		text := string(msg)
+		log.Printf("Received: %s\n", text)
 
-		log.Printf("Received: %s\n", msg)
+		if err := redis.Set("last_message", text, 10*time.Minute); err != nil {
+			log.Println("Redis SET error:", err)
+		}
 
-		err = conn.WriteMessage(websocket.TextMessage, []byte("Echo: "+string(msg)))
+		val, err := redis.Get("last_message")
 		if err != nil {
+			log.Println("Redis GET error:", err)
+		}
+
+		reply := fmt.Sprintf("Echo (stored in Redis): %s", val)
+		if err := conn.WriteMessage(websocket.TextMessage, []byte(reply)); err != nil {
 			log.Println("Write error:", err)
 			break
 		}
@@ -42,6 +54,8 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	redis.InitRedis("localhost:6379", "", 0)
+
 	http.HandleFunc("/ws", wsHandler)
 
 	addr := ":8080"
