@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/csessh/1M-backend/internal/protocol"
@@ -134,7 +135,13 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	redis.InitRedis("localhost:6379", "", 0)
+	// Get Redis address from environment variable, default to localhost
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
+
+	redis.InitRedis(redisAddr, "", 0)
 	http.HandleFunc("/ws", wsHandler)
 
 	log.Println("Server starting on :8080")

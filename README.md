@@ -140,11 +140,31 @@ This project replicates the viral [onemillioncheckboxes.com](https://onemillionc
 
 ## Quick Start
 
-### Prerequisites
-- Go 1.24+ installed
-- Redis server
+### Option 1: Docker (Recommended)
 
-### Run the Server
+**Prerequisites:** Docker and Docker Compose installed
+
+```bash
+# Start everything with one command
+docker-compose up
+
+# Or run in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f server
+
+# Stop everything
+docker-compose down
+```
+
+Server will start on `http://localhost:8080`
+
+WebSocket endpoint: `ws://localhost:8080/ws`
+
+### Option 2: Local Development
+
+**Prerequisites:** Go 1.24+ installed, Redis server
 
 ```bash
 # 1. Start Redis (in a separate terminal)
