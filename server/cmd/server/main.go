@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/csessh/1M-backend/internal/protocol"
@@ -24,50 +25,60 @@ type Message struct {
 	Value string `json:"value,omitempty"`
 }
 
-// Connection registry
-var (
-	connections = make(map[*websocket.Conn]bool)
-	connMutex   sync.RWMutex
-)
-
-// Register a new connection
-func registerConnection(conn *websocket.Conn) {
-	connMutex.Lock()
-	defer connMutex.Unlock()
-	connections[conn] = true
-	log.Printf("Client registered. Total connections: %d", len(connections))
+// ConnectionRegistry manages all active WebSocket connections
+type ConnectionRegistry struct {
+	connections map[*websocket.Conn]bool
+	mutex       sync.RWMutex
 }
 
-// Unregister a connection
-func unregisterConnection(conn *websocket.Conn) {
-	connMutex.Lock()
-	defer connMutex.Unlock()
-	delete(connections, conn)
-	log.Printf("Client unregistered. Total connections: %d", len(connections))
-}
-
-// Broadcast message to all connected clients except sender
-func broadcast(sender *websocket.Conn, msg Message) {
-	connMutex.RLock()
-	defer connMutex.RUnlock()
-
-	data, err := json.Marshal(msg)
-	if err != nil {
-		log.Printf("Error marshaling broadcast message: %v", err)
-		return
-	}
-
-	for conn := range connections {
-		if conn == sender {
-			continue
-		}
-
-		err := conn.WriteMessage(websocket.TextMessage, data)
-		if err != nil {
-			log.Printf("Error broadcasting to client: %v", err)
-		}
+// NewConnectionRegistry creates a new connection registry
+func NewConnectionRegistry() *ConnectionRegistry {
+	return &ConnectionRegistry{
+		connections: make(map[*websocket.Conn]bool),
 	}
 }
+
+// Register adds a new connection to the registry
+func (r *ConnectionRegistry) Register(conn *websocket.Conn) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	r.connections[conn] = true
+	log.Printf("Client registered. Total connections: %d", len(r.connections))
+}
+
+// Unregister removes a connection from the registry
+func (r *ConnectionRegistry) Unregister(conn *websocket.Conn) {
+	r.mutex.Lock()
+	defer r.mutex.Unlock()
+
+	if _, exists := r.connections[conn]; exists {
+		delete(r.connections, conn)
+		log.Printf("Client unregistered. Total connections: %d", len(r.connections))
+	}
+}
+
+// Count returns the number of active connections
+func (r *ConnectionRegistry) Count() int {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+	return len(r.connections)
+}
+
+// GetAll returns a snapshot of all active connections
+func (r *ConnectionRegistry) GetAll() []*websocket.Conn {
+	r.mutex.RLock()
+	defer r.mutex.RUnlock()
+
+	conns := make([]*websocket.Conn, 0, len(r.connections))
+	for conn := range r.connections {
+		conns = append(conns, conn)
+	}
+	return conns
+}
+
+// Global connection registry
+var registry = NewConnectionRegistry()
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -77,9 +88,10 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer conn.Close()
-	defer unregisterConnection(conn)
+	defer registry.Unregister(conn)
 
-	registerConnection(conn)
+	// Register the new connection
+	registry.Register(conn)
 	log.Println("Client connected")
 
 	// Send initial state to the new client
@@ -153,13 +165,13 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	redis.InitRedis("localhost:6379", "", 0)
+	// Get Redis address from environment variable, default to localhost
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "localhost:6379"
+	}
 
-	// Serve static files from public directory
-	fs := http.FileServer(http.Dir("../public"))
-	http.Handle("/", fs)
-
-	// WebSocket endpoint
+	redis.InitRedis(redisAddr, "", 0)
 	http.HandleFunc("/ws", wsHandler)
 
 	log.Println("Server starting on :8080")

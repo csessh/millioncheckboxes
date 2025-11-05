@@ -138,11 +138,67 @@ This project replicates the viral [onemillioncheckboxes.com](https://onemillionc
 - [ ] Economic model for infrastructure scaling?
 - [ ] Abuse prevention without impacting legitimate users?
 
-## Getting Started
+## Quick Start
 
-1. **Current Status:** Basic WebSocket server with Redis integration (needs architectural fixes)
-2. **Next Step:** Phase 1 foundation work - connection management rewrite
-3. **Development Order:** Must complete each phase's objectives before proceeding
+### Option 1: Docker (Recommended)
+
+**Prerequisites:** Docker and Docker Compose installed
+
+```bash
+# Start everything with one command
+docker-compose up
+
+# Or run in background
+docker-compose up -d
+
+# View logs
+docker-compose logs -f server
+
+# Stop everything
+docker-compose down
+```
+
+Server will start on `http://localhost:8080`
+
+WebSocket endpoint: `ws://localhost:8080/ws`
+
+### Option 2: Local Development
+
+**Prerequisites:** Go 1.24+ installed, Redis server
+
+```bash
+# 1. Start Redis (in a separate terminal)
+redis-server
+
+# 2. Navigate to server directory
+cd server
+
+# 3. Start the Go server
+go run cmd/server/main.go
+```
+
+Server will start on `http://localhost:8080`
+
+WebSocket endpoint: `ws://localhost:8080/ws`
+
+### Test Connection
+
+```bash
+# Send a test message
+wscat -c ws://localhost:8080/ws
+> {"cmd":"SET","index":42,"value":"true"}
+```
+
+---
+
+## Development Status
+
+**Current Phase:** Phase 1 - Foundation
+- ✅ Connection registry with thread-safe tracking
+- ✅ Binary protocol for bandwidth optimization
+- ✅ Redis bitfield storage for checkboxes
+- ⏳ Broadcasting mechanism (in progress)
+- ⏳ Frontend implementation (in progress)
 
 ## Key Metrics to Track
 
