@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Million Checkboxes - 10x10 Grid</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Million Checkboxes</h1>
+            <div class="status">
+                <span id="connection-status" class="disconnected">Disconnected</span>
+                <span id="user-count">Users: 0</span>
+            </div>
+        </header>
+
+        <div id="checkbox-grid" class="grid"></div>
+
+        <footer>
+            <p>Click any checkbox to toggle. Changes sync across all connected users.</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -94,6 +94,20 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	registry.Register(conn)
 	log.Println("Client connected")
 
+	// Send initial state to the new client
+	for i := 0; i < 100; i++ {
+		isChecked, err := redis.GetCheckbox(i)
+		if err == nil && isChecked {
+			initMsg := Message{
+				Cmd:   "SET",
+				Index: i,
+				Value: "true",
+			}
+			data, _ := json.Marshal(initMsg)
+			conn.WriteMessage(websocket.TextMessage, data)
+		}
+	}
+
 	for {
 		messageType, msgBytes, err := conn.ReadMessage()
 		if err != nil {
@@ -111,6 +125,19 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			if binaryMsg.Command == protocol.CmdSet {
 				log.Printf("Binary: Updating index %d -> %v", binaryMsg.CheckboxIndex, binaryMsg.IsChecked)
 				redis.SetCheckbox(int(binaryMsg.CheckboxIndex), binaryMsg.IsChecked)
+
+				// Broadcast to other clients
+				broadcastMsg := Message{
+					Cmd:   "SET",
+					Index: int(binaryMsg.CheckboxIndex),
+					Value: func() string {
+						if binaryMsg.IsChecked {
+							return "true"
+						}
+						return "false"
+					}(),
+				}
+				broadcast(conn, broadcastMsg)
 			}
 		} else if messageType == websocket.TextMessage {
 			log.Printf("JSON message received: %q", string(msgBytes))
@@ -129,6 +156,9 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 				value := msg.Value == "true"
 				log.Printf("JSON: Updating index %d -> %v", msg.Index, value)
 				redis.SetCheckbox(msg.Index, value)
+
+				// Broadcast to other clients
+				broadcast(conn, msg)
 			}
 		}
 	}
@@ -145,5 +175,7 @@ func main() {
 	http.HandleFunc("/ws", wsHandler)
 
 	log.Println("Server starting on :8080")
+	log.Println("Serving static files from ../public")
+	log.Println("WebSocket endpoint: ws://localhost:8080/ws")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
